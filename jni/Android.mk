@@ -17,7 +17,7 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 LOCAL_CFLAGS    := -std=c++14 -Wall -g -D_FILE_OFFSET_BITS=64 -D__IS_NDK_BUILD__=1 -O2 -fvisibility=hidden
 LOCAL_MODULE    := mempatch
-LOCAL_SRC_FILES := main.cpp Patcher.cpp ChangeString.cpp Ptrace.cpp Utility.cpp Converter.cpp Address.cpp LineReader.cpp linenoise/linenoise.cpp FreezeThread.cpp
+LOCAL_SRC_FILES := main.cpp Patcher.cpp ChangeString.cpp Memory_Linux.cpp Utility.cpp Converter.cpp Address.cpp LineReader.cpp linenoise/linenoise.cpp FreezeThread.cpp
 LOCAL_SRC_FILES += SnappedRange.cpp
 LOCAL_LDLIBS    := -llog -latomic
 LOCAL_CFLAGS    += -fPIE

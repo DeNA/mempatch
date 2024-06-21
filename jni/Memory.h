@@ -22,11 +22,11 @@
 
 #include "Address.h"
 
-class Ptrace {
+class Memory {
 public:
-  Ptrace() : pid_(-1), attached_(false) { ; }
-  explicit Ptrace(int pid, bool without_ptrace) : pid_(pid), attached_(false), without_ptrace_(without_ptrace) { ; }
-  virtual ~Ptrace() {
+  Memory() : pid_(-1), attached_(false) { ; }
+  explicit Memory(int pid, bool without_ptrace) : pid_(pid), attached_(false), without_ptrace_(without_ptrace) { ; }
+  virtual ~Memory() {
     if (pid_ != -1) {
       Detach();
     }
@@ -45,6 +45,7 @@ public:
   size_t WriteByPokeData(const Range &dest, const uint8_t *src, bool freeze_request) const;
   size_t Write(const Range &dest, const uint8_t *src, bool freeze_request) const;
   void Dump(const Range &src) const;
+  bool GenerateMaps(std::stringstream &ss);
 
 private:
   int pid_;

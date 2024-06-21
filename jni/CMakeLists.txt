@@ -1,15 +1,27 @@
-add_executable(mempatch
+set(SOURCE_FILES
     main.cpp
     Patcher.cpp
     ChangeString.cpp
-    Ptrace.cpp
     Utility.cpp
     Converter.cpp
     Address.cpp
     LineReader.cpp
     linenoise/linenoise.cpp
     FreezeThread.cpp
-    SnappedRange.cpp)
+    SnappedRange.cpp
+)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "android")
+    list(APPEND SOURCE_FILES
+        Memory_Linux.cpp
+    )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    list(APPEND SOURCE_FILES
+        Memory_Darwin.mm
+    )
+endif()
+
+add_executable(mempatch ${SOURCE_FILES})
 
 set_target_properties(mempatch PROPERTIES
     CXX_VISIBILITY_PRESET hidden

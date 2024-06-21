@@ -20,9 +20,9 @@
 #include <string>
 #include <unistd.h>
 
+#include "Config.h"
 #include "LineReader.h"
 #include "Patcher.h"
-
 const char *VERSION = "1.3.1";
 
 void Usage(const char *exepath) {

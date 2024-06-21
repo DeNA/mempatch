@@ -25,7 +25,7 @@
 #include "Address.h"
 #include "ChangeString.h"
 #include "FreezeThread.h"
-#include "Ptrace.h"
+#include "Memory.h"
 #include "Snapshot.h"
 
 class Patcher {
@@ -44,7 +44,7 @@ public:
   explicit Patcher(int pid, bool without_ptrace) { Init(pid, without_ptrace); }
   ~Patcher() {
     Exit();
-    ptrace_.reset();
+    memory_.reset();
     snapshot_.reset();
   }
 
@@ -122,7 +122,7 @@ public:
 private:
   void Init(int pid, bool without_ptrace) {
     last_process_time_ = -1;
-    ptrace_ = std::make_shared<Ptrace>(pid, without_ptrace);
+    memory_ = std::make_shared<Memory>(pid, without_ptrace);
   }
   bool CreateRangeSet();
   bool Process(const Mode mode, const ChangeString &change_str);
@@ -135,7 +135,7 @@ private:
   RangeSet range_set_;
   std::vector<TargetAddress> addr_set_;
   std::vector<std::unique_ptr<FreezeThread>> freeze_set_;
-  std::shared_ptr<Ptrace> ptrace_;
+  std::shared_ptr<Memory> memory_;
   std::unique_ptr<Snapshot> snapshot_;
   std::string range_scope_;
 

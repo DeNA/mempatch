@@ -2,3 +2,5 @@
 /obj
 /build
 .idea
+
+ios.toolchain.cmake

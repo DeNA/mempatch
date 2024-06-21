@@ -16,10 +16,10 @@
  */
 #include <string.h>
 
+#include "Config.h"
 #include "LineReader.h"
 #include "Utility.h"
 #include "linenoise/linenoise.h"
-
 std::map<std::string, LineReader::PatcherCommandFunc> LineReader::commands;
 
 void completion(const char *buf, linenoiseCompletions *lc) {
@@ -70,14 +70,16 @@ bool LineReader::Dispatch(Patcher &patcher, bool windows) {
 
   /* Load history from file. The history file is just a plain text file
    * where entries are separated by newlines. */
-  linenoiseHistoryLoad("/sdcard/mempatch_history.txt"); /* Load the history at startup */
+  std::string history_path = std::string(STORAGE_PATH) + "/mempatch_history.txt";
+
+  linenoiseHistoryLoad(history_path.c_str()); /* Load the history at startup */
 
   printf("\nPlease Input Command\n");
 
   char *buffer = nullptr;
   while ((buffer = GetLine(windows)) != nullptr) {
-    linenoiseHistoryAdd(buffer);                          /* Add to the history. */
-    linenoiseHistorySave("/sdcard/mempatch_history.txt"); /* Save the history on disk. */
+    linenoiseHistoryAdd(buffer);                /* Add to the history. */
+    linenoiseHistorySave(history_path.c_str()); /* Save the history on disk. */
     std::stringstream sin(buffer);
     free(buffer);
     buffer = nullptr;

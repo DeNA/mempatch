@@ -16,11 +16,14 @@
  */
 #define _LARGEFILE64_SOURCE
 
+#include "Memory.h"
+#include "Utility.h"
 #include <assert.h>
 #include <dirent.h> // opendir用
 #include <errno.h>
 #include <fcntl.h>
 #include <memory>
+#include <sstream>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ptrace.h>
@@ -29,12 +32,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "Ptrace.h"
-#include "Utility.h"
-
 // 全スレッドをATTACHしてからwaitする
 // 使い方が合っているかどうかは不明
-bool Ptrace::Attach() {
+bool Memory::Attach() {
   assert(pid_ >= 0);
   ClearCache();
   if (without_ptrace_ || attached_) {
@@ -61,7 +61,7 @@ bool Ptrace::Attach() {
   return true;
 }
 
-bool Ptrace::Detach() {
+bool Memory::Detach() {
   if (without_ptrace_ || !attached_) {
     attached_ = false;
     return true;
@@ -76,7 +76,7 @@ bool Ptrace::Detach() {
   return true;
 }
 
-size_t Ptrace::Read(uint8_t *dest, const Range &src) const {
+size_t Memory::Read(uint8_t *dest, const Range &src) const {
   assert(pid_ >= 0);
   assert(attached_);
   size_t n = src.Size();
@@ -100,7 +100,7 @@ size_t Ptrace::Read(uint8_t *dest, const Range &src) const {
   return ret;
 }
 
-size_t Ptrace::ReadWithCache(uint8_t *dest, const Range &src, const Range &parent_range) const {
+size_t Memory::ReadWithCache(uint8_t *dest, const Range &src, const Range &parent_range) const {
   assert(pid_ >= 0);
   assert(attached_);
   assert(parent_range.IsSuperset(src));
@@ -156,7 +156,7 @@ size_t Ptrace::ReadWithCache(uint8_t *dest, const Range &src, const Range &paren
 //     return n;
 // }
 
-size_t Ptrace::WriteByPokeData(const Address &dest, long value) const {
+size_t Memory::WriteByPokeData(const Address &dest, long value) const {
   assert(pid_ >= 0);
   assert(attached_);
   assert(!without_ptrace_);
@@ -168,7 +168,7 @@ size_t Ptrace::WriteByPokeData(const Address &dest, long value) const {
   return sizeof(long);
 }
 
-size_t Ptrace::WriteByPokeData(const Range &dest, const uint8_t *src, bool freeze_request) const {
+size_t Memory::WriteByPokeData(const Range &dest, const uint8_t *src, bool freeze_request) const {
   Utility::DebugLog("Using Poke");
   assert(pid_ >= 0);
   assert(attached_);
@@ -203,7 +203,7 @@ size_t Ptrace::WriteByPokeData(const Range &dest, const uint8_t *src, bool freez
   return dest.Size();
 }
 
-size_t Ptrace::Write(const Range &dest, const uint8_t *src, bool freeze_request) const {
+size_t Memory::Write(const Range &dest, const uint8_t *src, bool freeze_request) const {
   if (!without_ptrace_) {
     return WriteByPokeData(dest, src, freeze_request);
   }
@@ -247,7 +247,7 @@ size_t Ptrace::Write(const Range &dest, const uint8_t *src, bool freeze_request)
   // return n;
 }
 
-void Ptrace::Dump(const Range &src) const {
+void Memory::Dump(const Range &src) const {
   assert(pid_ >= 0);
   assert(attached_);
   size_t n = src.GetEnd().to_i() - src.GetStart().to_i();
@@ -262,7 +262,7 @@ void Ptrace::Dump(const Range &src) const {
 }
 
 // /proc/[pid]/task/* からThread IDを引っ張ってくる
-void Ptrace::LoadThreadIDs() {
+void Memory::LoadThreadIDs() {
   assert(pid_ != -1);
   char path[100];
   snprintf(path, 99, "/proc/%d/task", pid_);
@@ -283,7 +283,33 @@ void Ptrace::LoadThreadIDs() {
   closedir(dp);
 }
 
-void Ptrace::ClearCache() {
+void Memory::ClearCache() {
   cache_range_ = Range();
   cache_.reset();
+}
+
+/**
+ * /proc/[pid]/maps からマッピングされている読み書き可能なメモリ領域を列挙する
+ *
+ * @param rset 読み書き可能なメモリ領域
+ */
+bool Memory::GenerateMaps(std::stringstream &ss) {
+  assert(pid_ >= 0);
+
+  FILE *fp = nullptr;
+  char mmap_path[64];
+  char mmap_line[4096];
+
+  sprintf(mmap_path, "/proc/%d/maps", GetPid());
+  fp = fopen(mmap_path, "r");
+  if (fp == nullptr) {
+    Utility::DebugLog("process maps file '%s' can't be opend", mmap_path);
+    return false;
+  }
+
+  for (int i = 0; fgets(mmap_line, sizeof(mmap_line), fp) != nullptr; i++) {
+    ss << mmap_line << "\n";
+  }
+  fclose(fp);
+  return true;
 }
