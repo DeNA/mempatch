@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 #include "FreezeThread.h"
-#include "Ptrace.h"
+#include "Memory.h"
 #include "Utility.h"
 
 void FreezeThread::Start() {

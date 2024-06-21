@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "Address.h"
+#include "Config.h"
 #include "SnappedRange.h"
 
 class Snapshot {
@@ -61,6 +62,6 @@ public:
   }
 
 private:
-  std::string _filename = "/sdcard/mempatch_memory-snapshot";
+  std::string _filename = std::string(STORAGE_PATH) + "/mempatch_memory-snapshot";
   std::vector<SnappedRange> _saved;
 };

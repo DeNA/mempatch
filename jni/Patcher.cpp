@@ -23,6 +23,7 @@
 #include <time.h>
 #include <vector>
 
+#include "Config.h"
 #include "Converter.h"
 #include "Patcher.h"
 #include "Snapshot.h"
@@ -51,9 +52,9 @@ Patcher::Mode Patcher::GetMode(const std::string &str) {
 // Command
 //================================================================================
 
-bool Patcher::Attach(const std::string &command, std::stringstream &sin) { return ptrace_->Attach(); }
+bool Patcher::Attach(const std::string &command, std::stringstream &sin) { return memory_->Attach(); }
 
-bool Patcher::Detach(const std::string &command, std::stringstream &sin) { return ptrace_->Detach(); }
+bool Patcher::Detach(const std::string &command, std::stringstream &sin) { return memory_->Detach(); }
 
 bool Patcher::Clear(const std::string &command, std::stringstream &sin) {
   addr_set_.clear();
@@ -150,7 +151,7 @@ bool Patcher::Replace(const std::string &command, std::stringstream &sin) {
     return false;
   }
 
-  if (!ptrace_->Attach() || !CreateRangeSet()) {
+  if (!memory_->Attach() || !CreateRangeSet()) {
     return false;
   }
   TargetAddress address(Range::Fit(range_set_, Address(start)), change_str);
@@ -174,7 +175,7 @@ bool Patcher::Freeze(const std::string &command, std::stringstream &sin) {
     return false;
   }
 
-  if (!ptrace_->Attach() || !CreateRangeSet()) {
+  if (!memory_->Attach() || !CreateRangeSet()) {
     return false;
   }
   TargetAddress address(Range::Fit(range_set_, Address(start)), change_str);
@@ -182,7 +183,7 @@ bool Patcher::Freeze(const std::string &command, std::stringstream &sin) {
     Utility::DebugLog("Target Address is over the memory range");
     return false;
   }
-  freeze_set_.push_back(std::make_unique<FreezeThread>(ptrace_, address));
+  freeze_set_.push_back(std::make_unique<FreezeThread>(memory_, address));
   freeze_set_.back()->Start();
   return true;
 }
@@ -214,7 +215,7 @@ bool Patcher::Diff(const std::string &command, std::stringstream &sin) {
   DiffMode mode = temp[mode_str];
   if (mode == DiffMode::LOWER || mode == DiffMode::UPPER || mode == DiffMode::SAME || mode == DiffMode::CHANGE) {
     range_set_.clear();
-    if (!ptrace_->Attach() || !CreateRangeSet()) {
+    if (!memory_->Attach() || !CreateRangeSet()) {
       return false;
     }
 
@@ -231,7 +232,7 @@ bool Patcher::Diff(const std::string &command, std::stringstream &sin) {
 
         const std::unique_ptr<uint8_t[]> old_memory = sr.data();
         const std::unique_ptr<uint8_t[]> new_memory = std::make_unique<uint8_t[]>(n);
-        ptrace_->Read(new_memory.get(), range);
+        memory_->Read(new_memory.get(), range);
 
         for (size_t i = 0; i < n; i += 4) {
           int old_value = *(int *)(old_memory.get() + i);
@@ -277,10 +278,10 @@ bool Patcher::Diff(const std::string &command, std::stringstream &sin) {
         }
         size_t s = -1;
         if (addr_set_.size() < 10000) {
-          s = ptrace_->Read(temp_p.get(), Range(start, end, parent_range_it->GetComment()));
+          s = memory_->Read(temp_p.get(), Range(start, end, parent_range_it->GetComment()));
         } else {
           // open, readのsyscallが重いので、個数が多い場合はキャッシュ付きでやる
-          s = ptrace_->ReadWithCache(temp_p.get(), Range(start, end, parent_range_it->GetComment()), *parent_range_it);
+          s = memory_->ReadWithCache(temp_p.get(), Range(start, end, parent_range_it->GetComment()), *parent_range_it);
         }
         if (s != end - start) {
           continue;
@@ -306,14 +307,14 @@ bool Patcher::Diff(const std::string &command, std::stringstream &sin) {
     Utility::DebugLog("Found! %zd address", addr_set_.size());
   } else if (mode == DiffMode::START) {
     snapshot_ = std::make_unique<Snapshot>();
-    if (!ptrace_->Attach() || !CreateRangeSet()) {
+    if (!memory_->Attach() || !CreateRangeSet()) {
       return false;
     }
 
     for (RangeSet::const_iterator it = range_set_.begin(); it != range_set_.end(); ++it) {
       size_t n = it->Size();
       const std::unique_ptr<uint8_t[]> temp_p = std::make_unique<uint8_t[]>(n);
-      ptrace_->Read(temp_p.get(), *it);
+      memory_->Read(temp_p.get(), *it);
       snapshot_->push_back(*it, temp_p.get());
     }
     Utility::DebugLog("snapshot created!");
@@ -344,8 +345,9 @@ bool Patcher::Scope(const std::string &command, std::stringstream &sin) {
 }
 bool Patcher::Save(const std::string &command, std::stringstream &sin) {
   std::string filename;
+  std::string state_path = std::string(STORAGE_PATH) + "/mempatch_state.txt";
   if (!(sin >> filename)) {
-    filename = "/sdcard/mempatch_state.txt";
+    filename = state_path;
   }
   FILE *fp = fopen(filename.c_str(), "wb");
   if (fp == nullptr) {
@@ -357,8 +359,9 @@ bool Patcher::Save(const std::string &command, std::stringstream &sin) {
 }
 bool Patcher::Load(const std::string &command, std::stringstream &sin) {
   std::string filename;
+  std::string state_path = std::string(STORAGE_PATH) + "/mempatch_state.txt";
   if (!(sin >> filename)) {
-    filename = "/sdcard/mempatch_state.txt";
+    filename = state_path;
   }
   FILE *fp = fopen(filename.c_str(), "rb");
   if (fp == nullptr) {
@@ -376,8 +379,8 @@ bool Patcher::Dump(const std::string &command, std::stringstream &sin) {
       sscanf(hex_len.c_str(), "%zx", &len) != 1 || start > start + len) {
     return false;
   }
-  if (ptrace_->Attach() && CreateRangeSet()) {
-    ptrace_->Dump(Range::Fit(range_set_, Range(start, start + len, "")));
+  if (memory_->Attach() && CreateRangeSet()) {
+    memory_->Dump(Range::Fit(range_set_, Range(start, start + len, "")));
   } else {
     Utility::DebugLog("Failed Dumping");
   }
@@ -386,8 +389,9 @@ bool Patcher::Dump(const std::string &command, std::stringstream &sin) {
 
 bool Patcher::DumpAll(const std::string &command, std::stringstream &sin) {
   std::string filename;
+  std::string dump_path = std::string(STORAGE_PATH) + "/mempatch_dump.dat";
   if (!(sin >> filename)) {
-    filename = "/sdcard/mempatch_dump.dat";
+    filename = dump_path;
   }
   return DumpAll(filename);
 }
@@ -457,7 +461,7 @@ void Patcher::FreezeTerminate() {
 }
 void Patcher::Exit() {
   FreezeTerminate();
-  ptrace_->Detach();
+  memory_->Detach();
 }
 
 //================================================================================
@@ -465,14 +469,12 @@ void Patcher::Exit() {
 //================================================================================
 
 /**
- * /proc/[pid]/maps からマッピングされている読み書き可能なメモリ領域を列挙する
+ * 各OS毎にマッピングされている読み書き可能なメモリ領域を列挙する
  *
  * @param rset 読み書き可能なメモリ領域
  */
 bool Patcher::CreateRangeSet() {
-  assert(ptrace_->IsAttached());
-  FILE *fp = nullptr;
-  char mmap_path[64];
+  assert(memory_->IsAttached());
   char mmap_line[4096];
   const std::vector<std::string> ignore_list = {
       // 対象外のディレクトリ
@@ -481,17 +483,19 @@ bool Patcher::CreateRangeSet() {
       "/usr/lib/",
   };
 
-  sprintf(mmap_path, "/proc/%d/maps", ptrace_->GetPid());
-  fp = fopen(mmap_path, "r");
-  if (fp == nullptr) {
-    Utility::DebugLog("process maps file '%s' can't be opend", mmap_path);
+  std::stringstream ss;
+  if (!memory_->GenerateMaps(ss)) {
+    Utility::DebugLog("process maps for pid '%d' can't be generated", memory_->GetPid());
     return false;
   }
+
+  std::string maps_content = ss.str();
+  std::istringstream iss(maps_content);
 
   RangeSet prev_rset = range_set_;
   range_set_.clear();
 
-  for (int i = 0; fgets(mmap_line, sizeof(mmap_line), fp) != nullptr; i++) {
+  for (int i = 0; iss.getline(mmap_line, sizeof(mmap_line)); i++) {
     std::stringstream sin(mmap_line);
     std::string address, permission, offset, dev, inode, pathname;
     pathname = "";
@@ -512,7 +516,6 @@ bool Patcher::CreateRangeSet() {
     }
   next:;
   }
-  fclose(fp);
   return true;
 }
 
@@ -554,7 +557,7 @@ bool Patcher::Process(const Mode mode, const ChangeString &change_str) {
  * change_strで指定された文字列を含むメモリアドレスを列挙する
  */
 bool Patcher::LookUp(const ChangeString &change_str) {
-  if (!ptrace_->Attach() || !CreateRangeSet()) {
+  if (!memory_->Attach() || !CreateRangeSet()) {
     return false;
   }
   addr_set_.clear();
@@ -564,7 +567,7 @@ bool Patcher::LookUp(const ChangeString &change_str) {
     size_t end = it->GetEnd().to_i();
     size_t n = end - start;
     const std::unique_ptr<uint8_t[]> temp_p = std::make_unique<uint8_t[]>(n);
-    ptrace_->Read(temp_p.get(), *it);
+    memory_->Read(temp_p.get(), *it);
     size_t chstring_len = change_str.Size();
     if (n < chstring_len) {
       continue;
@@ -591,7 +594,7 @@ bool Patcher::LookUp(const ChangeString &change_str) {
  * addrsetのアドレスの値でchange_strに入ってないアドレスを除去する
  */
 bool Patcher::Filter(const ChangeString &change_str) {
-  if (!ptrace_->Attach() || !CreateRangeSet()) {
+  if (!memory_->Attach() || !CreateRangeSet()) {
     return false;
   }
   auto parent_range_it = range_set_.begin();
@@ -610,10 +613,10 @@ bool Patcher::Filter(const ChangeString &change_str) {
     const std::unique_ptr<uint8_t[]> temp_p = std::make_unique<uint8_t[]>(change_str.Size());
     size_t s = -1;
     if (addr_set_.size() < 10000) {
-      s = ptrace_->Read(temp_p.get(), Range(start, end, parent_range_it->GetComment()));
+      s = memory_->Read(temp_p.get(), Range(start, end, parent_range_it->GetComment()));
     } else {
       // open, readのsyscallが重いので、個数が多い場合はキャッシュ付きでやる
-      s = ptrace_->ReadWithCache(temp_p.get(), Range(start, end, parent_range_it->GetComment()), *parent_range_it);
+      s = memory_->ReadWithCache(temp_p.get(), Range(start, end, parent_range_it->GetComment()), *parent_range_it);
     }
     if (change_str.GetType() == Converter::Type::FLOAT_FUZZY_LITTLE_ENDIAN) {
       float min = 0.0f;
@@ -644,7 +647,7 @@ bool Patcher::Filter(const ChangeString &change_str) {
  * addrsetのアドレスの値を置換する
  */
 bool Patcher::ReplaceAll(const ChangeString &change_str) {
-  if (!ptrace_->Attach() || !CreateRangeSet()) {
+  if (!memory_->Attach() || !CreateRangeSet()) {
     return false;
   }
   size_t cnt = 0;
@@ -662,7 +665,7 @@ bool Patcher::ReplaceAll(const ChangeString &change_str) {
  * 中身の整合性のチェックとかはしない
  */
 bool Patcher::Replace(const TargetAddress &target_address, const ChangeString &change_str) {
-  if (!ptrace_->Attach() || !CreateRangeSet()) {
+  if (!memory_->Attach() || !CreateRangeSet()) {
     return false;
   }
   const Address &address = target_address.GetAddress();
@@ -673,18 +676,18 @@ bool Patcher::Replace(const TargetAddress &target_address, const ChangeString &c
   const std::unique_ptr<uint8_t[]> temp_p = std::make_unique<uint8_t[]>(n);
 
   // Debug Log
-  ptrace_->Read(temp_p.get(), Range(start, end, comment));
+  memory_->Read(temp_p.get(), Range(start, end, comment));
   std::vector<uint8_t> byte = Converter::RawByteToByte(temp_p.get(), n);
   Utility::DebugLog("Change: %s(%s) -> %s(%s) (%s)", Converter::ByteToHex(byte).c_str(),
                     Converter::GetString(change_str.GetType(), byte).c_str(), change_str.GetHexValue().c_str(),
                     change_str.GetValue().c_str(), comment.c_str());
 
   // Replace
-  ptrace_->Write(Range(start, end, comment), change_str.GetRawValue().data(), false);
+  memory_->Write(Range(start, end, comment), change_str.GetRawValue().data(), false);
 
   // Debug Log & Error Check
-  ptrace_->Dump(Range::Fit(range_set_, Range(start - 16, end + 16, comment)));
-  ptrace_->Read(temp_p.get(), Range(start, end, comment));
+  memory_->Dump(Range::Fit(range_set_, Range(start - 16, end + 16, comment)));
+  memory_->Read(temp_p.get(), Range(start, end, comment));
   if (memcmp(temp_p.get(), change_str.GetRawValue().data(), n) != 0) {
     // 指定した値に書き換わってなかった場合はエラーを出力
     Utility::DebugLog("*** Error ***\n*** Replace is failed!!! ***\n*** Please "
@@ -695,12 +698,12 @@ bool Patcher::Replace(const TargetAddress &target_address, const ChangeString &c
 }
 
 bool Patcher::DumpAll(const std::string &filename) {
-  if (ptrace_->Attach() && CreateRangeSet()) {
+  if (memory_->Attach() && CreateRangeSet()) {
     FILE *fp = fopen(filename.c_str(), "wb");
     if (fp == nullptr) {
       return false;
     }
-    fprintf(fp, "_%d", ptrace_->GetPid());
+    fprintf(fp, "_%d", memory_->GetPid());
     Utility::SetSerialize(fp, range_set_);
     for (RangeSet::const_iterator it = range_set_.begin(); it != range_set_.end(); ++it) {
       DumpRange(fp, *it);
@@ -715,7 +718,7 @@ bool Patcher::DumpAll(const std::string &filename) {
 bool Patcher::DumpRange(FILE *fp, const Range &range) {
   size_t n = range.Size();
   const std::unique_ptr<uint8_t[]> temp_p = std::make_unique<uint8_t[]>(n);
-  ptrace_->Read(temp_p.get(), range);
+  memory_->Read(temp_p.get(), range);
   for (size_t i = 0; i < n; i++) {
     fprintf(fp, "%c", temp_p[i]);
   }
@@ -731,7 +734,7 @@ std::unique_ptr<uint8_t[]> Patcher::LoadDumpRange(FILE *fp, const Range &range) 
 }
 
 void Patcher::Serialize(FILE *fp) const {
-  fprintf(fp, "_%d", ptrace_->GetPid());
+  fprintf(fp, "_%d", memory_->GetPid());
   fprintf(fp, "_%d", last_process_time_);
   Utility::SetSerialize(fp, range_set_);
   Utility::VectorSerialize(fp, addr_set_);
@@ -739,7 +742,7 @@ void Patcher::Serialize(FILE *fp) const {
 }
 void Patcher::DeSerialize(FILE *fp) {
   int pid;
-  if (fscanf(fp, "_%d", &pid) != 1 || pid != ptrace_->GetPid()) {
+  if (fscanf(fp, "_%d", &pid) != 1 || pid != memory_->GetPid()) {
     fprintf(stderr, "Error: Process ID is different\n");
     return;
   }

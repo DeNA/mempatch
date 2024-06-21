@@ -21,14 +21,14 @@
 #include <memory>
 
 #include "Address.h"
-#include "Ptrace.h"
+#include "Memory.h"
 
 class FreezeThread {
 public:
   FreezeThread() = delete;
   FreezeThread(FreezeThread const &) = delete;
   FreezeThread &operator=(FreezeThread const &) = delete;
-  FreezeThread(std::shared_ptr<Ptrace> &ptrace, const TargetAddress &target)
+  FreezeThread(std::shared_ptr<Memory> &ptrace, const TargetAddress &target)
       : ptrace_(ptrace), target_(target), terminate_flag_(false) {
     ;
   }
@@ -39,7 +39,7 @@ public:
 private:
   void ThreadFunction() const;
 
-  const std::shared_ptr<const Ptrace> ptrace_;
+  const std::shared_ptr<const Memory> ptrace_;
   std::thread freeze_thread_;
   const TargetAddress target_;
   std::atomic<bool> terminate_flag_;

@@ -1,15 +1,33 @@
-add_executable(mempatch
+set(SOURCE_FILES
     main.cpp
     Patcher.cpp
     ChangeString.cpp
-    Ptrace.cpp
     Utility.cpp
     Converter.cpp
     Address.cpp
     LineReader.cpp
     linenoise/linenoise.cpp
     FreezeThread.cpp
-    SnappedRange.cpp)
+    SnappedRange.cpp
+)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "android")
+    list(APPEND SOURCE_FILES
+        Memory_Linux.cpp
+    )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    list(APPEND SOURCE_FILES
+        Memory_Darwin.mm
+    )
+endif()
+
+set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+set(CMAKE_HAVE_THREADS_LIBRARY 1)
+set(CMAKE_USE_WIN32_THREADS_INIT 0)
+set(CMAKE_USE_PTHREADS_INIT 1)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+
+add_executable(mempatch ${SOURCE_FILES})
 
 set_target_properties(mempatch PROPERTIES
     CXX_VISIBILITY_PRESET hidden
