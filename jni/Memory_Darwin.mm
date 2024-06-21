@@ -63,6 +63,7 @@ size_t Memory::Read(uint8_t *dest, const Range &src) const {
 
   kr = task_for_pid(mach_task_self(), pid_, &task);
   if (kr != KERN_SUCCESS) {
+    Utility::DebugLog("*** Error: task_for_pid failed ***\nPID: %d\n%s (errno=%d)\n", pid_, strerror(errno), errno);
     return false;
   }
   mach_vm_size_t out_size;
@@ -110,6 +111,7 @@ size_t Memory::Write(const Range &dest, const uint8_t *src, bool freeze_request)
 
   kr = task_for_pid(mach_task_self(), pid_, &task);
   if (kr != KERN_SUCCESS) {
+    Utility::DebugLog("*** Error: task_for_pid failed ***\nPID: %d\n%s (errno=%d)\n", pid_, strerror(errno), errno);
     return false;
   }
   kr = mach_vm_write(task, dest.GetStart().to_i(), (vm_offset_t)src, n);
@@ -145,11 +147,17 @@ void Memory::ClearCache() {
 
 bool Memory::GenerateMaps(std::stringstream &ss) {
   assert(pid_ >= 0);
-  mach_port_t task = mach_task_self();
+  mach_port_t task;
   vm_address_t address = 0;
   vm_size_t size = 0;
   kern_return_t kr;
   natural_t depth = 0;
+
+  kr = task_for_pid(mach_task_self(), pid_, &task);
+  if (kr != KERN_SUCCESS) {
+    Utility::DebugLog("*** Error: task_for_pid failed ***\nPID: %d\n%s (errno=%d)\n", pid_, strerror(errno), errno);
+    return false;
+  }
 
   while (true) {
     vm_region_submap_info_64 info;
@@ -158,21 +166,23 @@ bool Memory::GenerateMaps(std::stringstream &ss) {
     // メモリリージョン情報を取得
     kr = vm_region_recurse_64(task, &address, &size, &depth, (vm_region_info_64_t)&info, &info_count);
     if (kr != KERN_SUCCESS) {
-      if (kr == KERN_INVALID_ADDRESS) {
-        break; // アドレス空間の終端に到達した
-      }
-      return false; // エラーが発生した場合はfalseを返す
+      break; // エラーが発生した場合はbreak
     }
 
     // /proc/pid/maps形式で出力をフォーマット
     ss << std::hex << address << "-" << (address + size) << " " << ((info.protection & VM_PROT_READ) ? 'r' : '-')
-       << ((info.protection & VM_PROT_WRITE) ? 'w' : '-') << ((info.protection & VM_PROT_EXECUTE) ? 'x' : '-') << " \n";
+       << ((info.protection & VM_PROT_WRITE) ? 'w' : '-') << ((info.protection & VM_PROT_EXECUTE) ? 'x' : '-') << " "
+       << std::setw(8) << std::setfill('0') << info.offset << " " // オフセット
+       << "00:00 "                                                // デバイス
+       << "0 ";                                                   // inode
 
     if (info.is_submap) {
       depth += 1; // サブマップの場合はdepthを増加
     } else {
       address += size; // 次のリージョンに移動
     }
+
+    ss << "" << std::endl;
   }
 
   return true;

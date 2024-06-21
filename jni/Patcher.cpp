@@ -477,10 +477,13 @@ bool Patcher::CreateRangeSet() {
   assert(memory_->IsAttached());
   char mmap_line[4096];
   const std::vector<std::string> ignore_list = {
-      // 対象外のディレクトリ
-      "/system/lib/",
-      "/lib/x86_64-linux-gnu/",
-      "/usr/lib/",
+  // 対象外のディレクトリ
+#if defined(_WIN32) || defined(_WIN64)
+#elif defined(__ANDROID__)
+      "/system/lib/", "/lib/x86_64-linux-gnu/", "/usr/lib/"
+#elif defined(__linux__)
+#elif defined(__APPLE__)
+#endif
   };
 
   std::stringstream ss;
