@@ -5,8 +5,6 @@ set(SOURCE_FILES
     Utility.cpp
     Converter.cpp
     Address.cpp
-    LineReader.cpp
-    linenoise/linenoise.cpp
     FreezeThread.cpp
     SnappedRange.cpp
 )
@@ -14,10 +12,20 @@ set(SOURCE_FILES
 if (CMAKE_SYSTEM_NAME STREQUAL "android")
     list(APPEND SOURCE_FILES
         Memory_Linux.cpp
+        linenoise/linenoise.cpp
+        LineReader.cpp
     )
 elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
     list(APPEND SOURCE_FILES
         Memory_Darwin.mm
+        linenoise/linenoise.cpp
+        LineReader.cpp
+    )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND SOURCE_FILES
+        getopt.cpp
+        Memory_Windows.cpp
+        LineReader_Windows.cpp
     )
 endif()
 
@@ -28,6 +36,13 @@ set_target_properties(mempatch PROPERTIES
     POSITION_INDEPENDENT_CODE ON)
 
 find_package(Threads REQUIRED)
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+target_link_libraries(mempatch PUBLIC
+    cxx_flags
+    Threads::Threads
+    psapi)
+else()
 target_link_libraries(mempatch PUBLIC
     cxx_flags
     Threads::Threads)
+endif()

@@ -18,8 +18,11 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string>
+#if !defined(_WIN32) && !defined(_WIN64)
 #include <unistd.h>
-
+#else
+#include "getopt.h"
+#endif
 #include "Config.h"
 #include "LineReader.h"
 #include "Patcher.h"
@@ -85,12 +88,13 @@ int main(int argc, char *argv[]) {
   }
   patcher = std::make_unique<Patcher>(pid, without_ptrace);
 
+#if !defined(_WIN32) && !defined(_WIN64)
   if (SIG_ERR == signal(SIGHUP, sigcatch) || SIG_ERR == signal(SIGINT, sigcatch) ||
       SIG_ERR == signal(SIGQUIT, sigcatch) || SIG_ERR == signal(SIGSEGV, sigcatch)) {
     fprintf(stderr, "failed to set signal handler\n");
     exit(1);
   }
-
+#endif
   // const std::string change_filename("/sdcard/changeset");
   // const std::string result_filename("/sdcard/changeresult");
 

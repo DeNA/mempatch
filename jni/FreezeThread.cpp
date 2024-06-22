@@ -14,8 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#define usleep(usec) Sleep((usec) / 1000) // 1ミリ秒以上のスリープをサポート
+#else
 #include <unistd.h>
-
+#endif
 #include "FreezeThread.h"
 #include "Memory.h"
 #include "Utility.h"
