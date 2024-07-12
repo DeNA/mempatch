@@ -722,9 +722,11 @@ bool Patcher::DumpRange(FILE *fp, const Range &range) {
   size_t n = range.Size();
   const std::unique_ptr<uint8_t[]> temp_p = std::make_unique<uint8_t[]>(n);
   memory_->Read(temp_p.get(), range);
-  for (size_t i = 0; i < n; i++) {
-    fprintf(fp, "%c", temp_p[i]);
+
+  if (fwrite(temp_p.get(), sizeof(uint8_t), n, fp) != n) {
+    return false;
   }
+
   return true;
 }
 std::unique_ptr<uint8_t[]> Patcher::LoadDumpRange(FILE *fp, const Range &range) {
