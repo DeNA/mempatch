@@ -29,13 +29,22 @@ $ ~/Library/Android/sdk/ndk/VERSION/ndk-build
 
 ### CMakeを使用してビルドする
 
-buildディレクトリを作り、buildディレクトリの中でcmakeコマンドを以下のように実行します。
+buildディレクトリを作り、buildディレクトリの中でcmakeコマンドを以下のように実行します(Windows以外)。
 
 ```
 $ mkdir build
 $ cd build
 $ cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/ndk/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a ..
 $ make -j8
+```
+
+Windowsの場合、[Ninja](https://github.com/ninja-build/ninja)をインストールしてビルドします。
+
+```
+$ mkdir build
+$ cd build
+$ cmake -G "Ninja" -DCMAKE_TOOLCHAIN_FILE=/path/to/ndk/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a ..
+$ ninja
 ```
 
 上記コマンドが成功すると、build/jni/mempatchという実行ファイルが生成されます。
