@@ -33,7 +33,9 @@ void Usage(const char *exepath) {
   fprintf(stderr, "Version: mempatch v%s\n", VERSION);
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "  -h        Print this message\n");
+#ifdef __linux__
   fprintf(stderr, "  -w        Without ptrace\n");
+#endif
   fprintf(stderr, "  -l        Windows mode\n");
   fprintf(stderr, "  -p pid    Set process ID to attach\n");
   fprintf(stderr, "\n");

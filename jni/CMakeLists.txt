@@ -9,7 +9,7 @@ set(SOURCE_FILES
     SnappedRange.cpp
 )
 
-if (CMAKE_SYSTEM_NAME STREQUAL "android")
+if (CMAKE_SYSTEM_NAME STREQUAL "Android")
     list(APPEND SOURCE_FILES
         Memory_Linux.cpp
         linenoise/linenoise.cpp
@@ -26,6 +26,18 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
         getopt.cpp
         Memory_Windows.cpp
         LineReader_Windows.cpp
+    )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND SOURCE_FILES
+        Memory_Linux.cpp
+        linenoise/linenoise.cpp
+        LineReader.cpp
+    )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    list(APPEND SOURCE_FILES
+        Memory_Darwin.mm
+        linenoise/linenoise.cpp
+        LineReader.cpp
     )
 endif()
 

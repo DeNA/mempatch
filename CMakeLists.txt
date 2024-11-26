@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.15)
 
 project(MemoryPatching VERSION 1.0)
 
-# android | iOS | Windows
-set(CMAKE_SYSTEM_NAME android)
+# Android | iOS | Windows | Linux | Darwin
+set(CMAKE_SYSTEM_NAME Android)
 
 add_library(cxx_flags INTERFACE)
 target_compile_features(cxx_flags INTERFACE cxx_std_14)
